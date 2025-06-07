@@ -28,12 +28,13 @@ poetry add flagvault-sdk
 ```python
 from flagvault_sdk import FlagVaultSDK, FlagVaultAuthenticationError, FlagVaultNetworkError
 
-# Initialize the SDK with your API credentials
+# Initialize the SDK with your API key
+# Environment is automatically detected from the key prefix:
+# - 'live_' prefix = production environment
+# - 'test_' prefix = test environment
 sdk = FlagVaultSDK(
-    api_key="your-api-key",
-    api_secret="your-api-secret",
-    # Optional: custom base URL and timeout
-    # base_url="https://custom-api.flagvault.com",
+    api_key="live_your-api-key-here",  # Use 'test_' for test environment
+    # Optional: custom timeout
     # timeout=10
 )
 
@@ -75,7 +76,7 @@ The SDK centers around one main class and method:
 
 ```python
 # Initialize once
-sdk = FlagVaultSDK(api_key="key", api_secret="secret")
+sdk = FlagVaultSDK(api_key="live_your-api-key-here")
 
 # Use throughout your application
 if sdk.is_enabled("new-checkout-flow"):
@@ -86,11 +87,12 @@ else:
 
 ### How It Works
 
-1. **Initialize**: Create SDK instance with API credentials from your FlagVault dashboard
-2. **Check Flag**: Call `is_enabled("flag-key")` anywhere in your code
-3. **HTTP Request**: SDK makes secure GET request to FlagVault API
-4. **Parse Response**: Returns boolean from API response
-5. **Handle Errors**: Specific exceptions for different failure scenarios
+1. **Initialize**: Create SDK instance with API key from your FlagVault dashboard
+2. **Environment Detection**: Environment automatically determined from key prefix (live_/test_)
+3. **Check Flag**: Call `is_enabled("flag-key")` anywhere in your code
+4. **HTTP Request**: SDK makes secure GET request to FlagVault API
+5. **Parse Response**: Returns boolean from API response
+6. **Handle Errors**: Specific exceptions for different failure scenarios
 
 ## Error Handling
 
@@ -133,32 +135,46 @@ except ValueError:
 
 ### SDK Parameters
 
-- **`api_key`** (required): Your FlagVault API key
-- **`api_secret`** (required): Your FlagVault API secret  
-- **`base_url`** (optional): Custom API endpoint. Defaults to `https://api.flagvault.com`
+- **`api_key`** (required): Your FlagVault API key with environment prefix
+  - `live_` prefix for production environment
+  - `test_` prefix for test environment
 - **`timeout`** (optional): Request timeout in seconds. Defaults to 10
+
+### Environment Management
+
+The SDK automatically detects the environment from your API key prefix:
+
+```python
+# Production environment
+prod_sdk = FlagVaultSDK(
+    api_key="live_abc123..."  # Automatically uses production environment
+)
+
+# Test environment
+test_sdk = FlagVaultSDK(
+    api_key="test_xyz789..."  # Automatically uses test environment
+)
+```
 
 ### Getting API Credentials
 
 1. Sign up at [FlagVault](https://flagvault.com)
-2. Create a new project
+2. Create a new organization
 3. Go to Settings > API Credentials
-4. Generate new API credentials
+4. You'll see separate API keys for production and test environments
 
 ## API Reference
 
-### `FlagVaultSDK(api_key, api_secret, base_url=None, timeout=10)`
+### `FlagVaultSDK(api_key, timeout=10)`
 
 Creates a new FlagVault SDK instance.
 
 **Parameters:**
-- `api_key` (str): Your FlagVault API key
-- `api_secret` (str): Your FlagVault API secret
-- `base_url` (str, optional): Custom API endpoint
+- `api_key` (str): Your FlagVault API key with environment prefix (live_/test_)
 - `timeout` (int, optional): Request timeout in seconds
 
 **Raises:**
-- `ValueError`: If api_key or api_secret is empty
+- `ValueError`: If api_key is empty
 
 ### `is_enabled(flag_key: str) -> bool`
 

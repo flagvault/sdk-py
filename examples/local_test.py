@@ -8,9 +8,8 @@ def test_local_server():
     """Test the SDK against a local server"""
     # Initialize the SDK with localhost URL
     sdk = FlagVaultSDK(
-        api_key="your-test-api-key",
-        api_secret="your-test-api-secret", 
-        base_url="http://localhost:3000"  # Adjust port as needed
+        api_key="test_your-api-key-here",  # Use test_ prefix for test environment
+        _base_url="http://localhost:3000"  # Adjust port as needed
     )
     
     try:
