@@ -28,7 +28,7 @@ setup(
         "Source": "https://github.com/flagvault/sdk-py",
         "Documentation": "https://flagvault.com/docs",
     },
-    keywords=["feature-flag", "sdk", "python", "flagvault"],
+    keywords=["feature-flag", "feature-flags", "feature-toggle", "feature-toggles", "sdk", "python", "flagvault", "remote-config", "a-b-testing", "experimentation"],
     install_requires=[
         "requests>=2.25.0",
     ],
@@ -43,7 +43,7 @@ setup(
         ],
     },
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",

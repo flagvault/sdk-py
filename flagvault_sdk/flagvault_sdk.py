@@ -35,8 +35,7 @@ class FlagVaultSDK:
     from flagvault_sdk import FlagVaultSDK
 
     sdk = FlagVaultSDK(
-        api_key="your-api-key",
-        api_secret="your-api-secret"
+        api_key="live_your-api-key-here"  # Use 'test_' prefix for test environment
     )
 
     # Check if a feature flag is enabled
@@ -69,28 +68,24 @@ class FlagVaultSDK:
     ```
     """
 
-    def __init__(self, api_key: str, api_secret: str, base_url: str = "https://api.flagvault.com", timeout: int = 10):
+    def __init__(self, api_key: str, timeout: int = 10, _base_url: str = "https://api.flagvault.com"):
         """
         Creates a new instance of the FlagVault SDK.
 
         Args:
             api_key: API Key for authenticating with the FlagVault service.
                     Can be obtained from your FlagVault dashboard.
-            api_secret: API Secret for authenticating with the FlagVault service.
-                       Can be obtained from your FlagVault dashboard.
-            base_url: Optional base URL for the FlagVault API.
-                     Defaults to "https://api.flagvault.com".
+                    Environment is automatically determined from the key prefix (live_ = production, test_ = test).
             timeout: Request timeout in seconds. Defaults to 10.
 
         Raises:
-            ValueError: If apiKey or apiSecret is not provided
+            ValueError: If api_key is not provided
         """
-        if not api_key or not api_secret:
-            raise ValueError("API Key and Secret are required to initialize the SDK.")
+        if not api_key:
+            raise ValueError("API Key is required to initialize the SDK.")
 
         self.api_key = api_key
-        self.api_secret = api_secret
-        self.base_url = base_url
+        self._base_url = _base_url
         self.timeout = timeout
 
     def is_enabled(self, flag_key: str) -> bool:
@@ -112,11 +107,10 @@ class FlagVaultSDK:
         if not flag_key:
             raise ValueError("flag_key is required to check if a feature is enabled.")
 
-        url = f"{self.base_url}/feature-flag/{flag_key}/enabled"
+        url = f"{self._base_url}/api/feature-flag/{flag_key}/enabled"
 
         headers = {
             "X-API-Key": self.api_key,
-            "X-API-Secret": self.api_secret,
         }
 
         try:
