@@ -6,7 +6,7 @@ from .flagvault_sdk import (
     FlagVaultAPIError,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     "FlagVaultSDK",
     "FlagVaultError",

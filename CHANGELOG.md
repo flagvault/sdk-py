@@ -5,6 +5,42 @@ All notable changes to the FlagVault Python SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-01-06
+
+### 🛡️ Graceful Error Handling
+
+This release introduces graceful error handling, making the SDK more resilient to network issues and API errors.
+
+### ✨ New Features
+
+- **Graceful error handling**: SDK now returns default values instead of throwing exceptions on API errors
+- **Enhanced error messages**: Detailed console warnings help with debugging while maintaining application stability
+- **Default value support**: `is_enabled()` method now accepts a `default_value` parameter (defaults to `False`)
+
+### 🛠️ Improvements
+
+- **Network resilience**: Automatic fallback to default values on network errors
+- **Authentication errors**: Graceful handling of invalid API keys (401/403 responses)
+- **Missing flags**: Graceful handling of non-existent flags (404 responses)
+- **API errors**: Graceful handling of server errors (5xx responses)
+- **Enhanced logging**: Informative console warnings for all error conditions
+
+### 📝 Usage
+
+```python
+# No try/catch needed - errors are handled gracefully
+is_enabled = sdk.is_enabled('my-feature', default_value=False)
+
+# On network error, you'll see:
+# FlagVault: Failed to connect to API for flag 'my-feature', using default: False
+```
+
+### 🔄 Backward Compatibility
+
+- Fully backward compatible with v1.0.0
+- Existing code will continue to work without changes
+- Only parameter validation errors (empty flag keys) still raise exceptions
+
 ## [1.0.0] - 2025-06-07
 
 ### 🎉 First Stable Release

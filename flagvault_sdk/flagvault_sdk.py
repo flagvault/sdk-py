@@ -39,7 +39,7 @@ class FlagVaultSDK:
     )
 
     # Check if a feature flag is enabled
-    is_enabled = sdk.is_enabled("my-feature-flag")
+    is_enabled = sdk.is_enabled("my-feature-flag", default_value=False)
     if is_enabled:
         # Feature is enabled, run feature code
         pass
@@ -68,7 +68,7 @@ class FlagVaultSDK:
     ```
     """
 
-    def __init__(self, api_key: str, timeout: int = 10, _base_url: str = "https://api.flagvault.com"):
+    def __init__(self, api_key: str, base_url: str = "http://localhost:3001", timeout: int = 10):
         """
         Creates a new instance of the FlagVault SDK.
 
@@ -76,6 +76,7 @@ class FlagVaultSDK:
             api_key: API Key for authenticating with the FlagVault service.
                     Can be obtained from your FlagVault dashboard.
                     Environment is automatically determined from the key prefix (live_ = production, test_ = test).
+            base_url: Base URL for the FlagVault API. Defaults to localhost for development.
             timeout: Request timeout in seconds. Defaults to 10.
 
         Raises:
@@ -85,29 +86,36 @@ class FlagVaultSDK:
             raise ValueError("API Key is required to initialize the SDK.")
 
         self.api_key = api_key
-        self._base_url = _base_url
+        self.base_url = base_url.rstrip('/')  # Remove trailing slash
         self.timeout = timeout
+        
+        # Environment is determined by the backend from API key prefix
+        # live_ = production, test_ = test
+        if api_key.startswith('live_'):
+            self.environment = 'production'
+        elif api_key.startswith('test_'):
+            self.environment = 'test'
+        else:
+            self.environment = 'production'  # Default fallback
 
-    def is_enabled(self, flag_key: str) -> bool:
+    def is_enabled(self, flag_key: str, default_value: bool = False) -> bool:
         """
         Checks if a feature flag is enabled.
 
         Args:
             flag_key: The key for the feature flag
+            default_value: Default value to return if flag cannot be retrieved or on error
 
         Returns:
-            A boolean indicating if the feature is enabled
+            A boolean indicating if the feature is enabled, or default_value on error
 
         Raises:
             ValueError: If flag_key is not provided
-            FlagVaultAuthenticationError: If authentication fails
-            FlagVaultNetworkError: If the network request fails
-            FlagVaultAPIError: If the API returns an error
         """
         if not flag_key:
             raise ValueError("flag_key is required to check if a feature is enabled.")
 
-        url = f"{self._base_url}/api/feature-flag/{flag_key}/enabled"
+        url = f"{self.base_url}/api/feature-flag/{flag_key}/enabled"
 
         headers = {
             "X-API-Key": self.api_key,
@@ -116,32 +124,44 @@ class FlagVaultSDK:
         try:
             response = requests.get(url, headers=headers, timeout=self.timeout)
             
-            # Handle authentication errors
+            # Handle authentication errors - log but return default
             if response.status_code == 401:
-                raise FlagVaultAuthenticationError("Invalid API credentials")
+                print(f"FlagVault: Invalid API credentials for flag '{flag_key}', using default: {default_value}")
+                return default_value
             elif response.status_code == 403:
-                raise FlagVaultAuthenticationError("Access forbidden - check your API credentials")
+                print(f"FlagVault: Access forbidden for flag '{flag_key}', using default: {default_value}")
+                return default_value
+            elif response.status_code == 404:
+                print(f"FlagVault: Flag '{flag_key}' not found, using default: {default_value}")
+                return default_value
             
-            # Handle other HTTP errors
+            # Handle other HTTP errors - log but return default
             if not response.ok:
                 try:
                     error_data = response.json()
                     error_message = error_data.get("message", f"HTTP {response.status_code}")
                 except (json.JSONDecodeError, ValueError):
                     error_message = f"HTTP {response.status_code}: {response.text[:100]}"
-                raise FlagVaultAPIError(f"API request failed: {error_message}")
+                print(f"FlagVault: API error for flag '{flag_key}': {error_message}, using default: {default_value}")
+                return default_value
 
             # Parse response
             try:
                 data = response.json()
+                return data.get("enabled", default_value)
             except (json.JSONDecodeError, ValueError) as e:
-                raise FlagVaultAPIError(f"Invalid JSON response: {e}")
-            
-            return data.get("enabled", False)
+                print(f"FlagVault: Invalid JSON response for flag '{flag_key}': {e}, using default: {default_value}")
+                return default_value
             
         except requests.exceptions.Timeout:
-            raise FlagVaultNetworkError(f"Request timed out after {self.timeout} seconds")
+            print(f"FlagVault: Request timed out for flag '{flag_key}' after {self.timeout} seconds, using default: {default_value}")
+            return default_value
         except requests.exceptions.ConnectionError:
-            raise FlagVaultNetworkError("Failed to connect to FlagVault API")
+            print(f"FlagVault: Failed to connect to API for flag '{flag_key}', using default: {default_value}")
+            return default_value
         except requests.exceptions.RequestException as e:
-            raise FlagVaultNetworkError(f"Network error: {e}")
+            print(f"FlagVault: Network error for flag '{flag_key}': {e}, using default: {default_value}")
+            return default_value
+        except Exception as e:
+            print(f"FlagVault: Unexpected error for flag '{flag_key}': {e}, using default: {default_value}")
+            return default_value
