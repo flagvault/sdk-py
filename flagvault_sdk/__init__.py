@@ -4,13 +4,19 @@ from .flagvault_sdk import (
     FlagVaultAuthenticationError,
     FlagVaultNetworkError,
     FlagVaultAPIError,
+    CacheEntry,
+    CacheStats,
+    FlagDebugInfo,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __all__ = [
     "FlagVaultSDK",
     "FlagVaultError",
     "FlagVaultAuthenticationError", 
     "FlagVaultNetworkError",
     "FlagVaultAPIError",
+    "CacheEntry",
+    "CacheStats", 
+    "FlagDebugInfo",
 ]

@@ -16,7 +16,7 @@ with open(os.path.join(here, "flagvault_sdk", "__init__.py"), encoding="utf-8") 
 setup(
     name="flagvault-sdk",
     version=__version__,
-    description="Lightweight Python SDK for FlagVault, enabling seamless feature flag integration and real-time flag status checks for Python applications.",
+    description="Lightweight Python SDK for FlagVault with intelligent caching, enabling seamless feature flag integration and real-time flag status checks for Python applications.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(),
@@ -28,7 +28,7 @@ setup(
         "Source": "https://github.com/flagvault/sdk-py",
         "Documentation": "https://flagvault.com/docs",
     },
-    keywords=["feature-flag", "feature-flags", "feature-toggle", "feature-toggles", "sdk", "python", "flagvault", "remote-config", "a-b-testing", "experimentation"],
+    keywords=["feature-flag", "feature-flags", "feature-toggle", "feature-toggles", "sdk", "python", "flagvault", "remote-config", "a-b-testing", "experimentation", "caching", "performance"],
     install_requires=[
         "requests>=2.25.0",
     ],

@@ -17,18 +17,18 @@ class TestFlagVaultSDK:
         sdk = FlagVaultSDK(api_key="test-api-key")
         assert sdk is not None
         assert sdk.api_key == "test-api-key"
-        assert sdk._base_url == "https://api.flagvault.com"
+        assert sdk.base_url == "https://api.flagvault.com"
         assert sdk.timeout == 10
 
     def test_initialization_with_custom_config(self):
         """Should initialize correctly with custom config"""
         sdk = FlagVaultSDK(
             api_key="test-api-key",
-            _base_url="https://custom.api.com",
+            base_url="https://custom.api.com",
             timeout=5
         )
         assert sdk.api_key == "test-api-key"
-        assert sdk._base_url == "https://custom.api.com"
+        assert sdk.base_url == "https://custom.api.com"
         assert sdk.timeout == 5
 
     def test_initialization_without_api_key_or_secret(self):
@@ -71,7 +71,7 @@ class TestFlagVaultSDK:
             sdk.is_enabled("")
 
     def test_is_enabled_with_401_authentication_error(self, requests_mock):
-        """Should throw FlagVaultAuthenticationError for 401 responses"""
+        """Should return default value for 401 responses"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             status_code=401
@@ -79,11 +79,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultAuthenticationError, match="Invalid API credentials"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value (False) on authentication error
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_403_authentication_error(self, requests_mock):
-        """Should throw FlagVaultAuthenticationError for 403 responses"""
+        """Should return default value for 403 responses"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             status_code=403
@@ -91,11 +92,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultAuthenticationError, match="Access forbidden - check your API credentials"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on forbidden error
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_api_error(self, requests_mock):
-        """Should throw FlagVaultAPIError for other HTTP errors"""
+        """Should return default value for other HTTP errors"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             status_code=500,
@@ -104,11 +106,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultAPIError, match="API request failed: Internal Server Error"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on API error
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_http_error_invalid_json(self, requests_mock):
-        """Should throw FlagVaultAPIError when HTTP error response has invalid JSON"""
+        """Should return default value when HTTP error response has invalid JSON"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             status_code=500,
@@ -117,11 +120,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultAPIError, match="API request failed: HTTP 500: <html>Internal Server Error</html>"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on API error with invalid JSON
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_network_error(self, requests_mock):
-        """Should throw FlagVaultNetworkError when the request fails"""
+        """Should return default value when the request fails"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             exc=requests.ConnectionError("Network error")
@@ -129,11 +133,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultNetworkError, match="Failed to connect to FlagVault API"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on network error
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_timeout_error(self, requests_mock):
-        """Should throw FlagVaultNetworkError when request times out"""
+        """Should return default value when request times out"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             exc=requests.Timeout("Request timed out")
@@ -141,11 +146,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultNetworkError, match="Request timed out after 10 seconds"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on timeout
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_invalid_json_response(self, requests_mock):
-        """Should throw FlagVaultAPIError when response is not valid JSON"""
+        """Should return default value when response is not valid JSON"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             text="invalid json"
@@ -153,11 +159,12 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultAPIError, match="Invalid JSON response"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on invalid JSON
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_generic_request_exception(self, requests_mock):
-        """Should throw FlagVaultNetworkError for generic RequestException"""
+        """Should return default value for generic RequestException"""
         requests_mock.get(
             f"{BASE_URL}/feature-flag/test-flag-key/enabled",
             exc=requests.RequestException("Generic request error")
@@ -165,8 +172,9 @@ class TestFlagVaultSDK:
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        with pytest.raises(FlagVaultNetworkError, match="Network error: Generic request error"):
-            sdk.is_enabled("test-flag-key")
+        # Should return default value on generic request error
+        assert sdk.is_enabled("test-flag-key") is False
+        assert sdk.is_enabled("test-flag-key", True) is True
 
     def test_is_enabled_with_missing_enabled_field(self, requests_mock):
         """Should return False when enabled field is missing from response"""
