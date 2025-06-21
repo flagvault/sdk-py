@@ -1,5 +1,5 @@
 import requests
-from typing import Dict, Optional, Any, NamedTuple, Tuple, Union
+from typing import Dict, Optional, Any, NamedTuple, Tuple
 import json
 import time
 import threading
@@ -7,28 +7,34 @@ from collections import OrderedDict
 import hashlib
 import os
 
+
 class FlagVaultError(Exception):
     """Base exception for FlagVault SDK errors."""
+
     pass
 
 
 class FlagVaultAuthenticationError(FlagVaultError):
     """Raised when authentication fails."""
+
     pass
 
 
 class FlagVaultNetworkError(FlagVaultError):
     """Raised when network requests fail."""
+
     pass
 
 
 class FlagVaultAPIError(FlagVaultError):
     """Raised when the API returns an error response."""
+
     pass
 
 
 class CacheEntry(NamedTuple):
     """Cache entry for storing flag data."""
+
     value: bool
     cached_at: float
     expires_at: float
@@ -37,6 +43,7 @@ class CacheEntry(NamedTuple):
 
 class CacheStats(NamedTuple):
     """Cache statistics for monitoring and debugging."""
+
     size: int
     hit_rate: float
     expired_entries: int
@@ -45,6 +52,7 @@ class CacheStats(NamedTuple):
 
 class FlagDebugInfo(NamedTuple):
     """Debug information for a specific flag."""
+
     flag_key: str
     cached: bool
     value: Optional[bool] = None
@@ -56,6 +64,7 @@ class FlagDebugInfo(NamedTuple):
 
 class FeatureFlagMetadata(NamedTuple):
     """Feature flag metadata returned from the API."""
+
     key: str
     is_enabled: bool
     name: str
@@ -110,15 +119,15 @@ class FlagVaultSDK:
     """
 
     def __init__(
-        self, 
-        api_key: str, 
-        base_url: str = "https://api.flagvault.com", 
+        self,
+        api_key: str,
+        base_url: str = "https://api.flagvault.com",
         timeout: int = 10,
         cache_enabled: bool = True,
         cache_ttl: int = 300,
         cache_max_size: int = 1000,
         cache_refresh_interval: int = 60,
-        cache_fallback_behavior: str = 'default'
+        cache_fallback_behavior: str = "default",
     ):
         """
         Creates a new instance of the FlagVault SDK.
@@ -133,7 +142,8 @@ class FlagVaultSDK:
             cache_ttl: Cache time-to-live in seconds. Defaults to 300 (5 minutes).
             cache_max_size: Maximum number of flags to cache. Defaults to 1000.
             cache_refresh_interval: Background refresh interval in seconds. Defaults to 60.
-            cache_fallback_behavior: Fallback behavior when cache fails ('default', 'api', 'throw'). Defaults to 'default'.
+            cache_fallback_behavior: Fallback behavior when cache fails ('default', 'api', 'throw').
+                                     Defaults to 'default'.
 
         Raises:
             ValueError: If api_key is not provided
@@ -142,30 +152,30 @@ class FlagVaultSDK:
             raise ValueError("API Key is required to initialize the SDK.")
 
         self.api_key = api_key
-        self.base_url = base_url.rstrip('/')  # Remove trailing slash
+        self.base_url = base_url.rstrip("/")  # Remove trailing slash
         self.timeout = timeout
-        
+
         # Cache configuration
         self.cache_enabled = cache_enabled
         self.cache_ttl = cache_ttl
         self.cache_max_size = cache_max_size
         self.cache_refresh_interval = cache_refresh_interval
         self.cache_fallback_behavior = cache_fallback_behavior
-        
+
         # Initialize cache (using OrderedDict for LRU behavior)
         self.cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self.cache_lock = threading.RLock()
         self.refresh_in_progress = False
         self.bulk_flags_cache: Optional[Dict[str, Any]] = None
-        
+
         # Environment is determined by the backend from API key prefix
         # live_ = production, test_ = test
-        if api_key.startswith('live_'):
-            self.environment = 'production'
-        elif api_key.startswith('test_'):
-            self.environment = 'test'
+        if api_key.startswith("live_"):
+            self.environment = "production"
+        elif api_key.startswith("test_"):
+            self.environment = "test"
         else:
-            self.environment = 'production'  # Default fallback
+            self.environment = "production"  # Default fallback
 
         # Start background refresh if enabled
         if self.cache_enabled and self.cache_refresh_interval > 0:
@@ -192,11 +202,11 @@ class FlagVaultSDK:
         # Check bulk cache first if available
         if self.cache_enabled and self.bulk_flags_cache:
             current_time = time.time()
-            if current_time < self.bulk_flags_cache.get('expires_at', 0):
-                flag = self.bulk_flags_cache['flags'].get(flag_key)
+            if current_time < self.bulk_flags_cache.get("expires_at", 0):
+                flag = self.bulk_flags_cache["flags"].get(flag_key)
                 if flag:
                     return self._evaluate_flag(flag, context)
-        
+
         # Check individual cache if enabled (include context in cache key)
         cache_key = f"{flag_key}:{context}" if context else flag_key
         if self.cache_enabled:
@@ -207,21 +217,24 @@ class FlagVaultSDK:
         # Cache miss - fetch from API
         try:
             value, should_cache = self._fetch_flag_from_api_with_cache_info(flag_key, default_value, context)
-            
+
             # Store in cache if enabled and the response was successful
             if self.cache_enabled and should_cache:
                 self._set_cached_value(cache_key, value)
-            
+
             return value
         except Exception as error:
             return self._handle_cache_miss(flag_key, default_value, error)
 
-    def _fetch_flag_from_api_with_cache_info(self, flag_key: str, default_value: bool, context: Optional[str] = None) -> Tuple[bool, bool]:
+    def _fetch_flag_from_api_with_cache_info(
+        self, flag_key: str, default_value: bool, context: Optional[str] = None
+    ) -> Tuple[bool, bool]:
         """Fetches a flag value from the API with cache information."""
         url = f"{self.base_url}/api/feature-flag/{flag_key}/enabled"
         if context:
             # URL encode the context parameter
             import urllib.parse
+
             url += f"?context={urllib.parse.quote(context)}"
 
         headers = {
@@ -230,7 +243,7 @@ class FlagVaultSDK:
 
         try:
             response = requests.get(url, headers=headers, timeout=self.timeout)
-            
+
             # Handle authentication errors - log but return default (don't cache)
             if response.status_code == 401:
                 print(f"FlagVault: Invalid API credentials for flag '{flag_key}', using default: {default_value}")
@@ -241,7 +254,7 @@ class FlagVaultSDK:
             elif response.status_code == 404:
                 print(f"FlagVault: Flag '{flag_key}' not found, using default: {default_value}")
                 return default_value, False
-            
+
             # Handle other HTTP errors - log but return default (don't cache)
             if not response.ok:
                 try:
@@ -259,9 +272,12 @@ class FlagVaultSDK:
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"FlagVault: Invalid JSON response for flag '{flag_key}': {e}, using default: {default_value}")
                 return default_value, False
-                
+
         except requests.Timeout:
-            print(f"FlagVault: Request timed out for flag '{flag_key}' after {self.timeout}s, using default: {default_value}")
+            print(
+                f"FlagVault: Request timed out for flag '{flag_key}' after {self.timeout}s, "
+                f"using default: {default_value}"
+            )
             return default_value, False
         except requests.ConnectionError:
             print(f"FlagVault: Failed to connect to API for flag '{flag_key}', using default: {default_value}")
@@ -305,18 +321,18 @@ class FlagVaultSDK:
                 value=value,
                 cached_at=current_time,
                 expires_at=current_time + self.cache_ttl,
-                last_accessed=current_time
+                last_accessed=current_time,
             )
             self.cache[flag_key] = entry
 
     def _handle_cache_miss(self, flag_key: str, default_value: bool, error: Exception) -> bool:
         """Handles cache miss scenarios based on configured fallback behavior."""
-        if self.cache_fallback_behavior == 'default':
+        if self.cache_fallback_behavior == "default":
             print(f"FlagVault: Cache miss for '{flag_key}', using default: {default_value}")
             return default_value
-        elif self.cache_fallback_behavior == 'throw':
+        elif self.cache_fallback_behavior == "throw":
             raise error
-        elif self.cache_fallback_behavior == 'api':
+        elif self.cache_fallback_behavior == "api":
             # For now, just return default - could implement retry logic
             print(f"FlagVault: Cache miss for '{flag_key}', using default: {default_value}")
             return default_value
@@ -325,6 +341,7 @@ class FlagVaultSDK:
 
     def _start_background_refresh(self) -> None:
         """Starts the background refresh timer."""
+
         def refresh_worker():
             while True:
                 try:
@@ -340,7 +357,7 @@ class FlagVaultSDK:
     def _refresh_expired_flags(self) -> None:
         """Refreshes flags that are about to expire."""
         self.refresh_in_progress = True
-        
+
         try:
             current_time = time.time()
             flags_to_refresh = []
@@ -350,7 +367,7 @@ class FlagVaultSDK:
             with self.cache_lock:
                 for flag_key, entry in list(self.cache.items()):
                     time_until_expiry = entry.expires_at - current_time
-                    if time_until_expiry <= 30 and ':' not in flag_key:  # 30 seconds, no context
+                    if time_until_expiry <= 30 and ":" not in flag_key:  # 30 seconds, no context
                         flags_to_refresh.append(flag_key)
 
             # Refresh flags in the background
@@ -387,7 +404,7 @@ class FlagVaultSDK:
                 size=len(self.cache),
                 hit_rate=hit_rate,
                 expired_entries=expired_count,
-                memory_usage=self._estimate_memory_usage()
+                memory_usage=self._estimate_memory_usage(),
             )
 
     def debug_flag(self, flag_key: str) -> FlagDebugInfo:
@@ -404,13 +421,10 @@ class FlagVaultSDK:
                     cached_at=entry.cached_at,
                     expires_at=entry.expires_at,
                     time_until_expiry=entry.expires_at - current_time,
-                    last_accessed=entry.last_accessed
+                    last_accessed=entry.last_accessed,
                 )
             else:
-                return FlagDebugInfo(
-                    flag_key=flag_key,
-                    cached=False
-                )
+                return FlagDebugInfo(flag_key=flag_key, cached=False)
 
     def clear_cache(self) -> None:
         """Clears the entire cache."""
@@ -434,10 +448,10 @@ class FlagVaultSDK:
     def get_all_flags(self) -> Dict[str, FeatureFlagMetadata]:
         """
         Fetches all feature flags for the organization.
-        
+
         Returns:
             A dictionary mapping flag keys to flag metadata
-            
+
         Raises:
             FlagVaultNetworkError: If network request fails
             FlagVaultAPIError: If API returns an error
@@ -445,45 +459,45 @@ class FlagVaultSDK:
         # Check bulk cache first
         if self.cache_enabled and self.bulk_flags_cache:
             current_time = time.time()
-            if current_time < self.bulk_flags_cache.get('expires_at', 0):
-                return self.bulk_flags_cache['flags'].copy()
-        
+            if current_time < self.bulk_flags_cache.get("expires_at", 0):
+                return self.bulk_flags_cache["flags"].copy()
+
         url = f"{self.base_url}/api/feature-flag"
         headers = {
             "X-API-Key": self.api_key,
         }
-        
+
         try:
             response = requests.get(url, headers=headers, timeout=self.timeout)
-            
+
             if not response.ok:
                 raise FlagVaultAPIError(f"Failed to fetch flags: {response.status_code} {response.text[:100]}")
-            
+
             data = response.json()
             flags = {}
-            
-            if 'flags' in data and isinstance(data['flags'], list):
-                for flag_data in data['flags']:
+
+            if "flags" in data and isinstance(data["flags"], list):
+                for flag_data in data["flags"]:
                     flag = FeatureFlagMetadata(
-                        key=flag_data['key'],
-                        is_enabled=flag_data['isEnabled'],
-                        name=flag_data['name'],
-                        rollout_percentage=flag_data.get('rolloutPercentage'),
-                        rollout_seed=flag_data.get('rolloutSeed')
+                        key=flag_data["key"],
+                        is_enabled=flag_data["isEnabled"],
+                        name=flag_data["name"],
+                        rollout_percentage=flag_data.get("rolloutPercentage"),
+                        rollout_seed=flag_data.get("rolloutSeed"),
                     )
                     flags[flag.key] = flag
-            
+
             # Cache the bulk response
             if self.cache_enabled:
                 current_time = time.time()
                 self.bulk_flags_cache = {
-                    'flags': flags.copy(),
-                    'cached_at': current_time,
-                    'expires_at': current_time + self.cache_ttl
+                    "flags": flags.copy(),
+                    "cached_at": current_time,
+                    "expires_at": current_time + self.cache_ttl,
                 }
-            
+
             return flags
-            
+
         except requests.Timeout:
             raise FlagVaultNetworkError(f"Request timed out after {self.timeout}s")
         except requests.ConnectionError:
@@ -499,24 +513,24 @@ class FlagVaultSDK:
         # If flag is disabled, always return false
         if not flag.is_enabled:
             return False
-        
+
         # If no rollout percentage set, return the flag's enabled state
         if flag.rollout_percentage is None or flag.rollout_seed is None:
             return flag.is_enabled
-        
+
         # Use provided context or generate a random one
         rollout_context = context or os.urandom(16).hex()
-        
+
         # Calculate consistent hash for this context + flag combination
-        hash_input = f"{rollout_context}-{flag.key}-{flag.rollout_seed}".encode('utf-8')
+        hash_input = f"{rollout_context}-{flag.key}-{flag.rollout_seed}".encode("utf-8")
         hash_bytes = hashlib.sha256(hash_input).digest()
-        
+
         # Convert first 2 bytes to a number between 0-9999 (for 0.01% precision)
         bucket = (hash_bytes[0] * 256 + hash_bytes[1]) % 10000
-        
+
         # Check if this context is in the rollout percentage
         threshold = flag.rollout_percentage * 100  # Convert percentage to 0-10000 scale
-        
+
         return bucket < threshold
 
     def preload_flags(self) -> None:

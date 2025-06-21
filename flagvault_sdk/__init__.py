@@ -9,14 +9,14 @@ from .flagvault_sdk import (
     FlagDebugInfo,
 )
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __all__ = [
     "FlagVaultSDK",
     "FlagVaultError",
-    "FlagVaultAuthenticationError", 
+    "FlagVaultAuthenticationError",
     "FlagVaultNetworkError",
     "FlagVaultAPIError",
     "CacheEntry",
-    "CacheStats", 
+    "CacheStats",
     "FlagDebugInfo",
 ]
