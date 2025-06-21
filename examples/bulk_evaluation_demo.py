@@ -30,7 +30,7 @@ def demonstrate_bulk_evaluation():
             print(f'  Seed: {flag.rollout_seed or "None"}')
         print()
         
-        # Method 3: Evaluate flags for different users
+        # Method 3: Evaluate flags for different users using is_enabled
         print('3. Evaluating flags for different users:')
         users = ['user-123', 'user-456', 'user-789', 'user-abc', 'user-def']
         
@@ -45,7 +45,7 @@ def demonstrate_bulk_evaluation():
             print(f'\nRollout evaluation for "{rollout_flag.key}" ({rollout_flag.rollout_percentage}%):')
             
             for user_id in users:
-                enabled = sdk.evaluate_flag(rollout_flag, user_id)
+                enabled = sdk.is_enabled(rollout_flag.key, False, user_id)
                 status = '✓ Enabled' if enabled else '✗ Disabled'
                 print(f'- {user_id}: {status}')
             
@@ -53,7 +53,7 @@ def demonstrate_bulk_evaluation():
             print('\nConsistency check - evaluating same user multiple times:')
             test_user = 'user-999'
             for i in range(3):
-                enabled = sdk.evaluate_flag(rollout_flag, test_user)
+                enabled = sdk.is_enabled(rollout_flag.key, False, test_user)
                 status = '✓ Enabled' if enabled else '✗ Disabled'
                 print(f'- Attempt {i + 1}: {status}')
         else:

@@ -195,7 +195,7 @@ class FlagVaultSDK:
             if current_time < self.bulk_flags_cache.get('expires_at', 0):
                 flag = self.bulk_flags_cache['flags'].get(flag_key)
                 if flag:
-                    return self.evaluate_flag(flag, context)
+                    return self._evaluate_flag(flag, context)
         
         # Check individual cache if enabled (include context in cache key)
         cache_key = f"{flag_key}:{context}" if context else flag_key
@@ -491,16 +491,10 @@ class FlagVaultSDK:
         except requests.RequestException as e:
             raise FlagVaultNetworkError(f"Network error: {e}")
 
-    def evaluate_flag(self, flag: FeatureFlagMetadata, context: Optional[str] = None) -> bool:
+    def _evaluate_flag(self, flag: FeatureFlagMetadata, context: Optional[str] = None) -> bool:
         """
         Evaluates a feature flag for a specific context using local rollout logic.
-        
-        Args:
-            flag: The flag metadata
-            context: Optional context ID for percentage rollouts (e.g., user_id, session_id)
-            
-        Returns:
-            Boolean indicating if the feature should be enabled
+        Internal method - not part of public API.
         """
         # If flag is disabled, always return false
         if not flag.is_enabled:
