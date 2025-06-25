@@ -181,23 +181,42 @@ class FlagVaultSDK:
         if self.cache_enabled and self.cache_refresh_interval > 0:
             self._start_background_refresh()
 
-    def is_enabled(self, flag_key: str, default_value: bool = False, context: Optional[str] = None) -> bool:
+    def is_enabled(self, flag_key: str, default_value: bool = False, context: Optional[str] = None, *, target_id: Optional[str] = None) -> bool:
         """
         Checks if a feature flag is enabled.
 
         Args:
             flag_key: The key for the feature flag
             default_value: Default value to return if flag cannot be retrieved or on error
-            context: Optional context ID for percentage rollouts (e.g., user_id, session_id)
+            context: DEPRECATED - Use target_id instead. Optional context ID for percentage rollouts
+            target_id: Optional target identifier for percentage rollouts (e.g., user_id, session_id)
+                      Must contain only alphanumeric characters, hyphens, and underscores
 
         Returns:
             A boolean indicating if the feature is enabled, or default_value on error
 
         Raises:
-            ValueError: If flag_key is not provided
+            ValueError: If flag_key is not provided or if target_id contains invalid characters
         """
         if not flag_key:
             raise ValueError("flag_key is required to check if a feature is enabled.")
+
+        # Handle parameter transition
+        effective_target_id = None
+        if target_id is not None and context is not None:
+            raise ValueError("Cannot specify both 'context' and 'target_id'. Use 'target_id' (context is deprecated).")
+        elif target_id is not None:
+            # Validate target_id format
+            import re
+            if not re.match(r'^[a-zA-Z0-9\-_]+$', target_id):
+                raise ValueError("target_id must only contain alphanumeric characters, hyphens, and underscores")
+            if len(target_id) > 128:
+                raise ValueError("target_id must not exceed 128 characters")
+            effective_target_id = target_id
+        elif context is not None:
+            # Show deprecation warning
+            print("FlagVault: The 'context' parameter is deprecated. Please use 'target_id' instead.")
+            effective_target_id = context
 
         # Check bulk cache first if available
         if self.cache_enabled and self.bulk_flags_cache:
@@ -205,10 +224,10 @@ class FlagVaultSDK:
             if current_time < self.bulk_flags_cache.get("expires_at", 0):
                 flag = self.bulk_flags_cache["flags"].get(flag_key)
                 if flag:
-                    return self._evaluate_flag(flag, context)
+                    return self._evaluate_flag(flag, effective_target_id)
 
-        # Check individual cache if enabled (include context in cache key)
-        cache_key = f"{flag_key}:{context}" if context else flag_key
+        # Check individual cache if enabled (include target_id in cache key)
+        cache_key = f"{flag_key}:{effective_target_id}" if effective_target_id else flag_key
         if self.cache_enabled:
             cached_value = self._get_cached_value(cache_key)
             if cached_value is not None:
@@ -216,7 +235,7 @@ class FlagVaultSDK:
 
         # Cache miss - fetch from API
         try:
-            value, should_cache = self._fetch_flag_from_api_with_cache_info(flag_key, default_value, context)
+            value, should_cache = self._fetch_flag_from_api_with_cache_info(flag_key, default_value, effective_target_id)
 
             # Store in cache if enabled and the response was successful
             if self.cache_enabled and should_cache:
@@ -227,15 +246,15 @@ class FlagVaultSDK:
             return self._handle_cache_miss(flag_key, default_value, error)
 
     def _fetch_flag_from_api_with_cache_info(
-        self, flag_key: str, default_value: bool, context: Optional[str] = None
+        self, flag_key: str, default_value: bool, target_id: Optional[str] = None
     ) -> Tuple[bool, bool]:
         """Fetches a flag value from the API with cache information."""
         url = f"{self.base_url}/api/feature-flag/{flag_key}/enabled"
-        if context:
-            # URL encode the context parameter
+        if target_id:
+            # URL encode the target_id parameter
             import urllib.parse
 
-            url += f"?context={urllib.parse.quote(context)}"
+            url += f"?targetId={urllib.parse.quote(target_id)}"
 
         headers = {
             "X-API-Key": self.api_key,
@@ -286,9 +305,9 @@ class FlagVaultSDK:
             print(f"FlagVault: Network error for flag '{flag_key}': {e}, using default: {default_value}")
             return default_value, False
 
-    def _fetch_flag_from_api(self, flag_key: str, default_value: bool, context: Optional[str] = None) -> bool:
+    def _fetch_flag_from_api(self, flag_key: str, default_value: bool, target_id: Optional[str] = None) -> bool:
         """Fetches a flag value from the API."""
-        value, _ = self._fetch_flag_from_api_with_cache_info(flag_key, default_value, context)
+        value, _ = self._fetch_flag_from_api_with_cache_info(flag_key, default_value, target_id)
         return value
 
     def _get_cached_value(self, flag_key: str) -> Optional[bool]:
@@ -505,9 +524,9 @@ class FlagVaultSDK:
         except requests.RequestException as e:
             raise FlagVaultNetworkError(f"Network error: {e}")
 
-    def _evaluate_flag(self, flag: FeatureFlagMetadata, context: Optional[str] = None) -> bool:
+    def _evaluate_flag(self, flag: FeatureFlagMetadata, target_id: Optional[str] = None) -> bool:
         """
-        Evaluates a feature flag for a specific context using local rollout logic.
+        Evaluates a feature flag for a specific target using local rollout logic.
         Internal method - not part of public API.
         """
         # If flag is disabled, always return false
@@ -518,17 +537,17 @@ class FlagVaultSDK:
         if flag.rollout_percentage is None or flag.rollout_seed is None:
             return flag.is_enabled
 
-        # Use provided context or generate a random one
-        rollout_context = context or os.urandom(16).hex()
+        # Use provided target_id or generate a random one
+        rollout_target_id = target_id or os.urandom(16).hex()
 
-        # Calculate consistent hash for this context + flag combination
-        hash_input = f"{rollout_context}-{flag.key}-{flag.rollout_seed}".encode("utf-8")
+        # Calculate consistent hash for this target_id + flag combination
+        hash_input = f"{rollout_target_id}-{flag.key}-{flag.rollout_seed}".encode("utf-8")
         hash_bytes = hashlib.sha256(hash_input).digest()
 
         # Convert first 2 bytes to a number between 0-9999 (for 0.01% precision)
         bucket = (hash_bytes[0] * 256 + hash_bytes[1]) % 10000
 
-        # Check if this context is in the rollout percentage
+        # Check if this target_id is in the rollout percentage
         threshold = flag.rollout_percentage * 100  # Convert percentage to 0-10000 scale
 
         return bucket < threshold

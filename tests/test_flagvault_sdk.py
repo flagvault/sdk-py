@@ -313,13 +313,13 @@ class TestCaching:
         assert sdk.get_cache_stats().size == 0
 
     def test_handle_context_in_cache_keys(self, requests_mock):
-        """Should handle context in cache keys"""
+        """Should handle context in cache keys (converted to targetId)"""
         requests_mock.get(
-            f"{BASE_URL}/feature-flag/test-flag/enabled?context=user-1",
+            f"{BASE_URL}/feature-flag/test-flag/enabled?targetId=user-1",
             json={"enabled": True},
         )
         requests_mock.get(
-            f"{BASE_URL}/feature-flag/test-flag/enabled?context=user-2",
+            f"{BASE_URL}/feature-flag/test-flag/enabled?targetId=user-2",
             json={"enabled": False},
         )
 
@@ -723,9 +723,9 @@ class TestRolloutEvaluation:
         assert result is True
 
     def test_use_context_parameter_in_api_calls(self, requests_mock):
-        """Should use context parameter in API calls"""
+        """Should use context parameter in API calls (converted to targetId)"""
         requests_mock.get(
-            f"{BASE_URL}/feature-flag/test-flag/enabled?context=user-123",
+            f"{BASE_URL}/feature-flag/test-flag/enabled?targetId=user-123",
             json={"enabled": True},
         )
 
@@ -733,19 +733,55 @@ class TestRolloutEvaluation:
 
         sdk.is_enabled("test-flag", False, "user-123")
 
-        # Verify the API was called with context parameter
-        assert "context=user-123" in requests_mock.last_request.url
+        # Verify the API was called with targetId parameter (context gets converted)
+        assert "targetId=user-123" in requests_mock.last_request.url
 
     def test_not_include_context_parameter_when_not_provided(self, requests_mock):
-        """Should not include context parameter when not provided"""
+        """Should not include targetId parameter when not provided"""
         requests_mock.get(f"{BASE_URL}/feature-flag/test-flag/enabled", json={"enabled": True})
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
         sdk.is_enabled("test-flag", False)
 
-        # Verify the API was called without context parameter
-        assert "context=" not in requests_mock.last_request.url
+        # Verify the API was called without targetId parameter
+        assert "targetId=" not in requests_mock.last_request.url
+
+    def test_use_target_id_parameter(self, requests_mock):
+        """Should use target_id parameter in API calls"""
+        requests_mock.get(
+            f"{BASE_URL}/feature-flag/test-flag/enabled?targetId=user-456",
+            json={"enabled": True},
+        )
+
+        sdk = FlagVaultSDK(api_key="test-api-key")
+
+        sdk.is_enabled("test-flag", False, target_id="user-456")
+
+        # Verify the API was called with targetId parameter
+        assert "targetId=user-456" in requests_mock.last_request.url
+
+    def test_target_id_validation(self):
+        """Should validate target_id parameter"""
+        sdk = FlagVaultSDK(api_key="test-api-key")
+
+        # Valid target_id should work
+        try:
+            sdk.is_enabled("test-flag", False, target_id="user-123_valid")
+        except ValueError:
+            pytest.fail("Valid target_id should not raise ValueError")
+
+        # Invalid characters should raise ValueError
+        with pytest.raises(ValueError, match="target_id must only contain alphanumeric"):
+            sdk.is_enabled("test-flag", False, target_id="user@invalid")
+
+        # Too long should raise ValueError
+        with pytest.raises(ValueError, match="target_id must not exceed 128 characters"):
+            sdk.is_enabled("test-flag", False, target_id="a" * 129)
+
+        # Both context and target_id should raise ValueError
+        with pytest.raises(ValueError, match="Cannot specify both 'context' and 'target_id'"):
+            sdk.is_enabled("test-flag", False, context="user-123", target_id="user-456")
 
 
 class TestDestroyAndCleanup:
@@ -926,18 +962,18 @@ class TestEdgeCases:
             sdk.get_all_flags()
 
     def test_handle_context_encoding_in_urls(self, requests_mock):
-        """Should handle context encoding in URLs"""
+        """Should handle context encoding in URLs (converted to targetId)"""
         requests_mock.get(
-            f"{BASE_URL}/feature-flag/test-flag/enabled?context=user%40example.com",
+            f"{BASE_URL}/feature-flag/test-flag/enabled?targetId=user%40example.com",
             json={"enabled": True},
         )
 
         sdk = FlagVaultSDK(api_key="test-api-key")
 
-        # Use context with special characters that need encoding
+        # Use context with special characters that need encoding (gets converted to targetId)
         sdk.is_enabled("test-flag", False, "user@example.com")
 
-        assert "context=user%40example.com" in requests_mock.last_request.url
+        assert "targetId=user%40example.com" in requests_mock.last_request.url
 
     def test_handle_bulk_cache_expiry(self, requests_mock):
         """Should handle bulk cache expiry"""
@@ -1025,7 +1061,7 @@ class TestBackgroundRefresh:
         import time
 
         requests_mock.get(f"{BASE_URL}/feature-flag/flag1/enabled", json={"enabled": True})
-        requests_mock.get(f"{BASE_URL}/feature-flag/flag2/enabled?context=user123", json={"enabled": False})
+        requests_mock.get(f"{BASE_URL}/feature-flag/flag2/enabled?targetId=user123", json={"enabled": False})
 
         sdk = FlagVaultSDK(api_key="test-api-key", cache_enabled=True, cache_ttl=60, cache_refresh_interval=0)
 
